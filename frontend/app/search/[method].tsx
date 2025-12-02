@@ -1,16 +1,15 @@
 // Location: app/search/[method].tsx
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert, Keyboard, Platform } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert, Keyboard, Switch } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import axios from 'axios';
-import { FontAwesome5, MaterialIcons, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { FontAwesome5, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { Audio } from 'expo-av'; // <--- Import Audio
 
-// --- KONFIGURASI IP ---
+// --- KONFIGURASI IP (SESUAIKAN) ---
 const API_URL = 'http://192.168.100.9:5000'; 
 
-// --- KOMPONEN HIGHLIGHT (YANG TADI) ---
+// Komponen Highlight (Tetap Sama)
 const HighlightText = ({ text, highlight, style }) => {
   if (!text) return null;
   if (!highlight || !highlight.trim()) return <Text style={style}>{text}</Text>;
@@ -37,26 +36,22 @@ export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  
-  // State untuk Recording
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
+
+  // --- STATE UNTUK KONFIGURASI ---
+  const [useStemming, setUseStemming] = useState(false);
+  const [useStopword, setUseStopword] = useState(false);
+  const [showOptions, setShowOptions] = useState(false); // Untuk toggle menu opsi
 
   const methodName = method ? method.toString().replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Search';
 
   useEffect(() => {
     if (method === 'clustering') handleSearch();
-    // Minta Izin Microphone saat halaman dibuka
-    Audio.requestPermissionsAsync();
   }, [method]);
 
-  // --- FUNGSI SEARCH (EXISTING) ---
-  const handleSearch = async (textToSearch = query) => {
+  const handleSearch = async () => {
     Keyboard.dismiss();
-    const finalQuery = textToSearch || query;
-
-    if (!finalQuery.trim() && method !== 'clustering') {
-        Alert.alert("Info", "Mohon masukkan kata kunci.");
+    if (!query.trim() && method !== 'clustering') {
+        Alert.alert("Info", "Masukkan kata kunci.");
         return;
     }
 
@@ -66,69 +61,24 @@ export default function SearchScreen() {
     try {
       let endpoint = `${API_URL}/search/${method}`;
       let response;
+      
+      const payload = { 
+          query: query,
+          // Kirim konfigurasi ke backend
+          use_stemming: useStemming,
+          use_stopword: useStopword
+      };
+
       if (method === 'clustering') {
-         response = await axios.get(`${API_URL}/clustering`, { timeout: 10000 });
+         response = await axios.get(`${API_URL}/clustering`);
       } else {
-         response = await axios.post(endpoint, { query: finalQuery }, { timeout: 10000 });
+         response = await axios.post(endpoint, payload);
       }
+
       setResults(response.data);
     } catch (error) {
       console.error(error);
       Alert.alert("Gagal", "Koneksi backend bermasalah.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- LOGIKA REKAM SUARA ---
-  const startRecording = async () => {
-    try {
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      setRecording(recording);
-      setIsRecording(true);
-    } catch (err) {
-      Alert.alert('Gagal', 'Tidak bisa mengakses microphone.');
-    }
-  };
-
-  const stopRecording = async () => {
-    if (!recording) return;
-    setIsRecording(false);
-    setLoading(true); // Tampilkan loading saat proses transkrip
-
-    try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI(); 
-      setRecording(null);
-
-      // Upload Audio ke Backend
-      const formData = new FormData();
-      // @ts-ignore
-      formData.append('audio', {
-        uri: uri,
-        type: 'audio/m4a', // Format rekaman default Expo
-        name: 'voice_search.m4a',
-      });
-
-      console.log("Uploading audio...");
-      const response = await axios.post(`${API_URL}/voice-search`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-
-      const transcribedText = response.data.text;
-      console.log("Hasil Suara:", transcribedText);
-      
-      if (transcribedText) {
-          setQuery(transcribedText); // Isi kolom search
-          handleSearch(transcribedText); // Langsung cari
-      }
-
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Gagal Mengenali Suara", "Pastikan internet lancar & backend punya FFmpeg.");
     } finally {
       setLoading(false);
     }
@@ -147,7 +97,16 @@ export default function SearchScreen() {
           </View>
           {item.category && <View style={styles.categoryBadge}><Text style={styles.categoryText}>{item.category}</Text></View>}
       </View>
+      
       <HighlightText text={item.text} highlight={method === 'clustering' ? '' : query} style={styles.cardBody} />
+      
+      {/* Tampilkan info debugging jika ada */}
+      {item.processed_text && (
+          <Text style={{fontSize: 10, color: '#aaa', marginTop: 5, fontStyle: 'italic'}}>
+              Processed: "{item.processed_text}"
+          </Text>
+      )}
+
       {(item.score !== undefined || item.cluster !== undefined) && (
         <View style={styles.cardFooter}>
             {item.score !== undefined && <View style={[styles.metricBadge, styles.metricScore]}><Ionicons name="speedometer-outline" size={14} color="#00864e" /><Text style={[styles.metricText, {color: '#00864e'}]}>{typeof item.score === 'number' ? item.score.toFixed(4) : item.score}</Text></View>}
@@ -163,30 +122,50 @@ export default function SearchScreen() {
       <Stack.Screen options={{ title: methodName, headerStyle: { backgroundColor: '#F8F9FE' }, headerShadowVisible: false }} />
 
       {method !== 'clustering' && (
-        <View style={styles.searchSection}>
-            <View style={styles.searchBar}>
-                {/* Tombol Mic */}
-                <TouchableOpacity 
-                    onPressIn={startRecording} // Tekan Tahan untuk Rekam
-                    onPressOut={stopRecording} // Lepas untuk Stop & Cari
-                    style={[styles.micButton, isRecording && styles.micActive]}
-                >
-                    <Ionicons name={isRecording ? "mic" : "mic-outline"} size={22} color={isRecording ? "#fff" : "#6C63FF"} />
+        <View>
+            <View style={styles.searchSection}>
+                <View style={styles.searchBar}>
+                    <Ionicons name="search-outline" size={20} color="#A0A0A0" style={{marginRight: 10}} />
+                    <TextInput
+                        style={styles.searchInput}
+                        placeholder="Cari dokumen..."
+                        value={query}
+                        onChangeText={setQuery}
+                        onSubmitEditing={handleSearch}
+                    />
+                    {/* Tombol Toggle Option */}
+                    <TouchableOpacity onPress={() => setShowOptions(!showOptions)}>
+                        <Ionicons name={showOptions ? "options" : "options-outline"} size={24} color="#6C63FF" />
+                    </TouchableOpacity>
+                </View>
+                <TouchableOpacity style={[styles.searchButton, loading && {backgroundColor: '#B0B0C0'}]} onPress={handleSearch} disabled={loading}>
+                    {loading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="arrow-forward" size={24} color="#fff" />}
                 </TouchableOpacity>
-
-                <TextInput
-                    style={styles.searchInput}
-                    placeholder={isRecording ? "Mendengarkan..." : "Cari (Tahan Mic)..."}
-                    placeholderTextColor="#A0A0A0"
-                    value={query}
-                    onChangeText={setQuery}
-                    onSubmitEditing={() => handleSearch()}
-                    returnKeyType="search"
-                />
             </View>
-            <TouchableOpacity style={[styles.searchButton, loading && {backgroundColor: '#B0B0C0'}]} onPress={() => handleSearch()} disabled={loading}>
-                 {loading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="arrow-forward" size={24} color="#fff" />}
-            </TouchableOpacity>
+
+            {/* --- PANEL OPSI (MUNCUL JIKA DIKLIK) --- */}
+            {showOptions && (
+                <View style={styles.optionsPanel}>
+                    <View style={styles.optionRow}>
+                        <Text style={styles.optionLabel}>Stemming (Sastrawi)</Text>
+                        <Switch 
+                            trackColor={{ false: "#767577", true: "#6C63FF" }}
+                            thumbColor={useStemming ? "#fff" : "#f4f3f4"}
+                            onValueChange={() => setUseStemming(!useStemming)}
+                            value={useStemming}
+                        />
+                    </View>
+                    <View style={styles.optionRow}>
+                        <Text style={styles.optionLabel}>Stopword Removal</Text>
+                        <Switch 
+                            trackColor={{ false: "#767577", true: "#6C63FF" }}
+                            thumbColor={useStopword ? "#fff" : "#f4f3f4"}
+                            onValueChange={() => setUseStopword(!useStopword)}
+                            value={useStopword}
+                        />
+                    </View>
+                </View>
+            )}
         </View>
       )}
 
@@ -197,8 +176,7 @@ export default function SearchScreen() {
         keyExtractor={(item) => item.id.toString()}
         renderItem={renderItem}
         contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={!loading && <View style={styles.emptyState}><MaterialIcons name="find-in-page" size={80} color="#E0E0E0" /><Text style={styles.emptyText}>{method === 'clustering' ? "Data kosong." : "Tidak ditemukan."}</Text></View>}
+        ListEmptyComponent={!loading && <View style={styles.emptyState}><MaterialIcons name="find-in-page" size={80} color="#E0E0E0" /><Text style={styles.emptyText}>Tidak ditemukan.</Text></View>}
       />
     </View>
   );
@@ -206,16 +184,17 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FE' },
-  searchSection: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 15, alignItems: 'center' },
-  searchBar: { flex: 1, flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 8, borderRadius: 15, alignItems: 'center', shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2, marginRight: 10, borderWidth: 1, borderColor: '#F0F0F0' },
-  searchInput: { flex: 1, fontSize: 16, color: '#333', marginLeft: 10, height: 40 },
-  
-  // Style Tombol Mic
-  micButton: { width: 40, height: 40, borderRadius: 12, backgroundColor: '#F0F0F3', alignItems: 'center', justifyContent: 'center' },
-  micActive: { backgroundColor: '#FF4757' }, // Merah saat merekam
-  
+  searchSection: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 10, alignItems: 'center' },
+  searchBar: { flex: 1, flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 15, alignItems: 'center', shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2, marginRight: 10, borderWidth: 1, borderColor: '#F0F0F0' },
+  searchInput: { flex: 1, fontSize: 16, color: '#333' },
   searchButton: { width: 50, height: 50, backgroundColor: '#6C63FF', borderRadius: 15, alignItems: 'center', justifyContent: 'center', shadowColor: "#6C63FF", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 5 },
-  listContainer: { paddingHorizontal: 20, paddingBottom: 30, paddingTop: 5 },
+  
+  // Style Options Panel
+  optionsPanel: { backgroundColor: '#fff', marginHorizontal: 20, marginBottom: 10, padding: 15, borderRadius: 15, borderWidth: 1, borderColor: '#eee' },
+  optionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  optionLabel: { fontSize: 14, color: '#333', fontWeight: '500' },
+
+  listContainer: { paddingHorizontal: 20, paddingBottom: 30 },
   centerLoader: { marginTop: 50, alignItems: 'center' },
   card: { backgroundColor: '#fff', borderRadius: 20, padding: 20, marginBottom: 15, shadowColor: "#1E1E2D", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#F5F5FA' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
