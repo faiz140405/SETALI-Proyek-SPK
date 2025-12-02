@@ -145,6 +145,16 @@ export default function HomeScreen() {
       </View>
       
       <View style={{height: 100}} />
+
+      <TouchableOpacity 
+        style={styles.fab}
+        activeOpacity={0.8}
+        onPress={() => router.push('/add-document')}
+      >
+        <Ionicons name="add" size={30} color="#fff" />
+      </TouchableOpacity>
+
+      <View style={{height: 100}} />
     </ScrollView>
   );
 }
@@ -219,4 +229,22 @@ const styles = StyleSheet.create({
 
   pillText: { color: '#fff', fontSize: 10, fontWeight: 'bold' },
   rowCenter: { flexDirection: 'row' },
+
+  fab: {
+    position: 'absolute',
+    bottom: 30, // Sesuaikan agar tidak tertutup TabBar
+    right: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#6C63FF', // Warna Ungu Utama
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 8,
+    shadowColor: "#6C63FF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    zIndex: 999, // Agar selalu di atas
+  }
 });
