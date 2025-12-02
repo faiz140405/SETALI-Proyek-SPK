@@ -223,6 +223,32 @@ def analyze_result():
 
     return jsonify(analysis)
 
+@app.route('/documents', methods=['POST'])
+def add_document():
+    data = request.json
+    
+    # Validasi sederhana
+    if not data or 'text' not in data:
+        return jsonify({"error": "Data teks tidak boleh kosong"}), 400
+
+    # Buat ID baru (ID terakhir + 1)
+    new_id = len(documents) + 1
+    
+    new_doc = {
+        "id": new_id,
+        "text": data.get('text'),
+        "category": data.get('category', 'Umum') # Default kategori 'Umum'
+    }
+    
+    # Masukkan ke list dokumen sementara (di memori)
+    documents.append(new_doc)
+    
+    return jsonify({
+        "message": "Dokumen berhasil ditambahkan!", 
+        "total_docs": len(documents),
+        "doc": new_doc
+    })
+
 # 6. PROBABILISTIC (Binary Independence Model - BIM)
 @app.route('/search/bim', methods=['POST'])
 def search_bim():
