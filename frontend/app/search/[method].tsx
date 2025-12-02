@@ -1,10 +1,11 @@
 // Location: app/search/[method].tsx
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert, Keyboard, Switch } from 'react-native';
+import { StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert, Keyboard, Switch, ScrollView } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import axios from 'axios';
 import { FontAwesome5, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // <--- LIBRARY BARU
 
 // --- KONFIGURASI IP (SESUAIKAN) ---
 const API_URL = 'http://192.168.100.9:5000'; 
@@ -37,34 +38,77 @@ export default function SearchScreen() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // --- STATE UNTUK KONFIGURASI ---
+  // --- STATE BARU ---
+  const [history, setHistory] = useState<string[]>([]); // Menyimpan riwayat
+  const [showOptions, setShowOptions] = useState(false);
   const [useStemming, setUseStemming] = useState(false);
   const [useStopword, setUseStopword] = useState(false);
-  const [showOptions, setShowOptions] = useState(false); // Untuk toggle menu opsi
 
   const methodName = method ? method.toString().replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Search';
 
+  // Load History saat pertama kali buka
   useEffect(() => {
+    loadHistory();
     if (method === 'clustering') handleSearch();
   }, [method]);
 
-  const handleSearch = async () => {
+  // --- FUNGSI RIWAYAT ---
+  const loadHistory = async () => {
+    try {
+      const stored = await AsyncStorage.getItem('search_history');
+      if (stored) {
+        setHistory(JSON.parse(stored));
+      }
+    } catch (e) { console.error("Gagal load history", e); }
+  };
+
+  const saveToHistory = async (text: string) => {
+    if (!text.trim()) return;
+    try {
+      // Ambil history lama, buang duplikat, tambah yang baru di depan
+      let newHistory = [text, ...history.filter(h => h !== text)];
+      // Simpan maksimal 5 riwayat saja agar tidak penuh
+      newHistory = newHistory.slice(0, 5);
+      
+      setHistory(newHistory);
+      await AsyncStorage.setItem('search_history', JSON.stringify(newHistory));
+    } catch (e) { console.error("Gagal save history", e); }
+  };
+
+  const clearHistory = async () => {
+      setHistory([]);
+      await AsyncStorage.removeItem('search_history');
+  };
+
+  const onHistoryClick = (text: string) => {
+      setQuery(text);
+      handleSearch(text); // Langsung cari
+  };
+  // ---------------------
+
+  const handleSearch = async (overrideQuery?: string) => {
     Keyboard.dismiss();
-    if (!query.trim() && method !== 'clustering') {
+    const textToSearch = overrideQuery || query;
+
+    if (!textToSearch.trim() && method !== 'clustering') {
         Alert.alert("Info", "Masukkan kata kunci.");
         return;
     }
 
     setLoading(true);
     setResults([]); 
+    
+    // Simpan ke history jika bukan clustering
+    if (method !== 'clustering') {
+        saveToHistory(textToSearch);
+    }
 
     try {
       let endpoint = `${API_URL}/search/${method}`;
       let response;
       
       const payload = { 
-          query: query,
-          // Kirim konfigurasi ke backend
+          query: textToSearch,
           use_stemming: useStemming,
           use_stopword: useStopword
       };
@@ -88,7 +132,7 @@ export default function SearchScreen() {
     <TouchableOpacity 
       style={styles.card}
       activeOpacity={0.7}
-      onPress={() => router.push({ pathname: "/detail-analysis", params: { doc_id: item.id, method, query, score: item.score }})}
+      onPress={() => router.push({ pathname: "/detail-analysis", params: { doc_id: item.id, method, query: query || '', score: item.score }})}
     >
       <View style={styles.cardHeader}>
           <View style={styles.idContainer}>
@@ -100,7 +144,6 @@ export default function SearchScreen() {
       
       <HighlightText text={item.text} highlight={method === 'clustering' ? '' : query} style={styles.cardBody} />
       
-      {/* Tampilkan info debugging jika ada */}
       {item.processed_text && (
           <Text style={{fontSize: 10, color: '#aaa', marginTop: 5, fontStyle: 'italic'}}>
               Processed: "{item.processed_text}"
@@ -131,38 +174,47 @@ export default function SearchScreen() {
                         placeholder="Cari dokumen..."
                         value={query}
                         onChangeText={setQuery}
-                        onSubmitEditing={handleSearch}
+                        onSubmitEditing={() => handleSearch()}
                     />
-                    {/* Tombol Toggle Option */}
                     <TouchableOpacity onPress={() => setShowOptions(!showOptions)}>
                         <Ionicons name={showOptions ? "options" : "options-outline"} size={24} color="#6C63FF" />
                     </TouchableOpacity>
                 </View>
-                <TouchableOpacity style={[styles.searchButton, loading && {backgroundColor: '#B0B0C0'}]} onPress={handleSearch} disabled={loading}>
+                <TouchableOpacity style={[styles.searchButton, loading && {backgroundColor: '#B0B0C0'}]} onPress={() => handleSearch()} disabled={loading}>
                     {loading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="arrow-forward" size={24} color="#fff" />}
                 </TouchableOpacity>
             </View>
 
-            {/* --- PANEL OPSI (MUNCUL JIKA DIKLIK) --- */}
+            {/* --- PANEL RIWAYAT (MUNCUL JIKA HASIL KOSONG & QUERY KOSONG) --- */}
+            {!loading && results.length === 0 && history.length > 0 && !query && (
+                <View style={styles.historyContainer}>
+                    <View style={styles.historyHeader}>
+                        <Text style={styles.historyTitle}>Terakhir Dicari</Text>
+                        <TouchableOpacity onPress={clearHistory}>
+                            <Text style={styles.clearText}>Hapus</Text>
+                        </TouchableOpacity>
+                    </View>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{flexDirection:'row'}}>
+                        {history.map((item, index) => (
+                            <TouchableOpacity key={index} style={styles.historyChip} onPress={() => onHistoryClick(item)}>
+                                <MaterialIcons name="history" size={14} color="#666" style={{marginRight: 5}} />
+                                <Text style={styles.historyText}>{item}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+
+            {/* --- PANEL OPSI --- */}
             {showOptions && (
                 <View style={styles.optionsPanel}>
                     <View style={styles.optionRow}>
                         <Text style={styles.optionLabel}>Stemming (Sastrawi)</Text>
-                        <Switch 
-                            trackColor={{ false: "#767577", true: "#6C63FF" }}
-                            thumbColor={useStemming ? "#fff" : "#f4f3f4"}
-                            onValueChange={() => setUseStemming(!useStemming)}
-                            value={useStemming}
-                        />
+                        <Switch trackColor={{ false: "#767577", true: "#6C63FF" }} thumbColor={useStemming ? "#fff" : "#f4f3f4"} onValueChange={() => setUseStemming(!useStemming)} value={useStemming} />
                     </View>
                     <View style={styles.optionRow}>
                         <Text style={styles.optionLabel}>Stopword Removal</Text>
-                        <Switch 
-                            trackColor={{ false: "#767577", true: "#6C63FF" }}
-                            thumbColor={useStopword ? "#fff" : "#f4f3f4"}
-                            onValueChange={() => setUseStopword(!useStopword)}
-                            value={useStopword}
-                        />
+                        <Switch trackColor={{ false: "#767577", true: "#6C63FF" }} thumbColor={useStopword ? "#fff" : "#f4f3f4"} onValueChange={() => setUseStopword(!useStopword)} value={useStopword} />
                     </View>
                 </View>
             )}
@@ -189,10 +241,17 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 16, color: '#333' },
   searchButton: { width: 50, height: 50, backgroundColor: '#6C63FF', borderRadius: 15, alignItems: 'center', justifyContent: 'center', shadowColor: "#6C63FF", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 5 },
   
-  // Style Options Panel
   optionsPanel: { backgroundColor: '#fff', marginHorizontal: 20, marginBottom: 10, padding: 15, borderRadius: 15, borderWidth: 1, borderColor: '#eee' },
   optionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   optionLabel: { fontSize: 14, color: '#333', fontWeight: '500' },
+
+  // STYLE HISTORY
+  historyContainer: { paddingHorizontal: 20, marginBottom: 15 },
+  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
+  historyTitle: { fontWeight: 'bold', color: '#555', fontSize: 12 },
+  clearText: { color: '#FF6B6B', fontSize: 12 },
+  historyChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#eee' },
+  historyText: { fontSize: 12, color: '#333' },
 
   listContainer: { paddingHorizontal: 20, paddingBottom: 30 },
   centerLoader: { marginTop: 50, alignItems: 'center' },

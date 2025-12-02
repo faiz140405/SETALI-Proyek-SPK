@@ -1,60 +1,84 @@
 # 📱 Sistem Temu Kembali (Information Retrieval Mobile App)
 
-Aplikasi mobile berbasis **React Native** dan **Python Flask** yang dirancang untuk mendemonstrasikan berbagai metode Sistem Temu Kembali Informasi (*Information Retrieval*). Proyek ini dibuat untuk memenuhi tugas mata kuliah Sistem Temu Kembali.
+![React Native](https://img.shields.io/badge/React_Native-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![Expo](https://img.shields.io/badge/Expo-1B1F23?style=for-the-badge&logo=expo&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![Flask](https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
 
-## ✨ Fitur Utama
-Aplikasi ini mengimplementasikan 6 metode pencarian dokumen secara lengkap:
+> **Project Tugas Kuliah: Sistem Temu Kembali** > Sebuah aplikasi mobile pintar yang mendemonstrasikan bagaimana mesin pencari bekerja, mulai dari pengolahan teks hingga perhitungan relevansi matematis.
 
-1.  **Regex Search:** Pencarian pola teks presisi (e.g., email, tanggal).
-2.  **Vector Space Model (VSM):** Ranking dokumen berdasarkan *Cosine Similarity* & *TF-IDF*.
-3.  **Boolean Retrieval:** Pencarian eksak menggunakan logika operator AND/OR.
-4.  **Relevance Feedback:** Ekspansi query otomatis berdasarkan feedback relevansi (Query Expansion).
-5.  **Document Clustering:** Pengelompokan dokumen otomatis menggunakan *K-Means (Unsupervised)*.
-6.  **Probabilistic (BIM):** Estimasi peluang relevansi dokumen (*Binary Independence Model*).
+---
 
-🚀 **Fitur Unggulan:** **Explainable IR** - Klik hasil pencarian untuk melihat detail langkah demi langkah perhitungan matematis (Tokenisasi, Filtering, Scoring) secara transparan.
+## 📸 Screenshots
+| Halaman Home | Pilihan Metode | Detail Analisis |
+|:---:|:---:|:---:|
+| <img src="https://via.placeholder.com/150x300?text=Home" width="150" /> | <img src="https://via.placeholder.com/150x300?text=Features" width="150" /> | <img src="https://via.placeholder.com/150x300?text=Detail" width="150" /> |
+
+---
+
+## ✨ Fitur Utama & Metode IR
+
+Aplikasi ini tidak hanya mencari dokumen, tapi juga **menjelaskan** bagaimana dokumen itu ditemukan.
+
+### 🧠 6 Metode Inti
+| Metode | Deskripsi |
+| :--- | :--- |
+| 🔡 **Regex Search** | Pencarian pola karakter presisi (cocok untuk email, tanggal, kode). |
+| 📐 **Vector Space Model** | Ranking dokumen menggunakan pembobotan **TF-IDF** & **Cosine Similarity**. |
+| ⚖️ **Boolean Retrieval** | Pencarian eksak menggunakan logika operator himpunan (**AND/OR**). |
+| 🔄 **Relevance Feedback** | Sistem memperbaiki query otomatis berdasarkan feedback relevansi (*Query Expansion*). |
+| 🕸️ **Document Clustering** | Pengelompokan dokumen otomatis menggunakan **K-Means** (*Unsupervised Learning*). |
+| 🎲 **Probabilistic (BIM)** | Estimasi peluang relevansi dokumen menggunakan *Binary Independence Model*. |
+
+### 🚀 Fitur Canggih Tambahan
+* **🎙️ Voice Search:** Cari dokumen hanya dengan suara (Integrasi Google Speech API).
+* **📊 Visualisasi Data:** Grafik batang (*Bar Chart*) frekuensi kata kunci pada dokumen.
+* **🔍 Explainable IR:** Transparansi algoritma! Klik hasil pencarian untuk melihat langkah tokenisasi, stemming, hingga scoring.
+* **⚙️ Preprocessing Toggle:** User bisa menyalakan/mematikan *Stemming* (Sastrawi) dan *Stopword Removal* secara real-time.
+* **📝 Manajemen Dokumen:** Tambah dokumen baru ke dalam korpus langsung dari aplikasi.
+* **🕒 Riwayat Pencarian:** Menyimpan history kata kunci secara lokal.
 
 ---
 
 ## 🛠️ Teknologi yang Digunakan
 
-### Frontend (Mobile)
-* **Framework:** React Native (Expo Router)
-* **Language:** TypeScript
-* **Networking:** Axios
-* **UI/UX:** Modern Dashboard Style, Custom Pill Tab Bar, Lottie/Icons.
+### 📱 Frontend (Mobile)
+* **Framework:** React Native (via Expo Router)
+* **Bahasa:** TypeScript
+* **UI Components:** `react-native-svg-charts`, `vector-icons`
+* **Storage:** `AsyncStorage`
+* **Audio:** `expo-av`
 
-### Backend (Server)
+### 🖥️ Backend (Server)
 * **Framework:** Python Flask
-* **Machine Learning:** Scikit-Learn (TF-IDF, Cosine Similarity, K-Means)
-* **NLP:** NLTK (Text Processing)
-* **Math:** NumPy
+* **Machine Learning:** Scikit-Learn, NumPy
+* **NLP:** NLTK, Sastrawi (Bahasa Indonesia)
+* **Audio Processing:** Pydub, SpeechRecognition, FFmpeg
 
 ---
 
-## ⚙️ Cara Instalasi & Menjalankan
+## ⚙️ Panduan Instalasi (Langkah demi Langkah)
 
-Ikuti langkah-langkah berikut secara berurutan untuk menjalankan proyek di komputer lokal Anda.
+### Prasyarat
+Pastikan di komputer Anda sudah terinstall:
+1.  **Node.js** & npm
+2.  **Python 3.x**
+3.  **FFmpeg** (Wajib untuk fitur Voice Search di Windows) -> *Tambahkan ke Path Environment Variable*.
 
 ### 1. Clone Repository
 ```bash
 git clone [https://github.com/USERNAME_ANDA/NAMA_REPO_ANDA.git](https://github.com/USERNAME_ANDA/NAMA_REPO_ANDA.git)
 cd NAMA_REPO_ANDA
-2. Setup Backend (Python Flask)
-Siapkan server terlebih dahulu agar API tersedia.
-
-Bash
-
-# Masuk ke folder backend
+# Masuk folder backend
 cd backend
 
-# Buat Virtual Environment (Rekomendasi)
+# Buat Virtual Environment
 python -m venv venv
 
-# Aktifkan Virtual Environment
-# Untuk Windows:
+# Aktifkan (Windows)
 venv\Scripts\activate
-# Untuk Mac/Linux:
+# Aktifkan (Mac/Linux)
 source venv/bin/activate
 
 # Install Dependencies
@@ -62,64 +86,35 @@ pip install -r requirements.txt
 
 # Jalankan Server
 python app.py
-Pastikan terminal menampilkan: Running on http://0.0.0.0:5000
-
-3. Setup Frontend (React Native)
-Buka terminal baru (jangan matikan terminal backend), lalu masuk ke folder frontend.
-
-Bash
-
-# Kembali ke root, lalu masuk frontend
-cd ../frontend
+# Masuk folder frontend
+cd frontend
 
 # Install Dependencies
 npm install
-4. ⚠️ Konfigurasi IP Address (PENTING)
-Agar HP Android/iOS Anda bisa berkomunikasi dengan Laptop, Anda harus mengatur IP Address.
 
-Buka Command Prompt/Terminal, ketik ipconfig (Windows) atau ifconfig (Mac/Linux).
-
-Salin IPv4 Address (misal: 192.168.1.10).
-
-Buka file frontend/app/search/[method].tsx dan frontend/app/detail-analysis.tsx.
-
-Ganti variabel API_URL:
-
-JavaScript
-
-// Ganti dengan IP Laptop Anda
-const API_URL = '[http://192.168.x.x:5000](http://192.168.x.x:5000)';
-5. Jalankan Aplikasi
-Bash
-
+# Jalankan Aplikasi
 npx expo start
-Scan QR Code yang muncul menggunakan aplikasi Expo Go di HP Anda.
-
-📝 Struktur Folder
-Plaintext
+// Ganti dengan IP Laptop Anda yang baru
+const API_URL = '[http://192.168.1.10:5000](http://192.168.1.10:5000)';
 
 /
-├── backend/            # Server Python Flask
-│   ├── app.py          # Main Logic & API Endpoints
-│   ├── data.py         # Dummy Corpus Data
-│   └── requirements.txt
+├── backend/                  # 🐍 Python Flask Server
+│   ├── app.py                # Main Controller & API Routes
+│   ├── data.py               # In-Memory Database (Corpus)
+│   └── requirements.txt      # Dependency List
 │
-└── frontend/           # React Native Expo
+└── frontend/                 # ⚛️ React Native App
     ├── app/
-    │   ├── (tabs)/     # Halaman Menu (Home, Features, Guide)
-    │   ├── search/     # Halaman Pencarian Dinamis
-    │   └── detail-analysis.tsx  # Halaman Explainable AI
-    └── ...
-❓ Troubleshooting
-Masalah: "Network Request Failed" atau "Axios Error"
-
-Pastikan Laptop dan HP terhubung ke WiFi yang sama.
-
-Pastikan IP Address di kodingan frontend sudah benar sesuai IP Laptop saat ini.
-
-Matikan Firewall laptop sementara waktu jika memblokir koneksi masuk.
-
-Pastikan app.py berjalan dengan host 0.0.0.0.
+    │   ├── (tabs)/           # Navigation Tabs (Home, Features, Guide)
+    │   ├── search/           # Search Logic & Voice Input
+    │   ├── detail-analysis   # Visualization & Explanation Page
+    │   └── add-document      # CRUD Page
+    ├── assets/               # Images & Icons
+    └── package.json
 
 👨‍💻 Author
-[Faiz Nizar Nu'aim]
+Faiz Nizar Nu'aim Mahasiswa Teknik Informatika
+
+Universitas Teknokrat Indonesia
+
+Dibuat dengan ❤️ menggunakan React Native & Python
