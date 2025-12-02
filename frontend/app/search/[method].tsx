@@ -7,8 +7,48 @@ import { FontAwesome5, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 
 // --- KONFIGURASI IP ---
-// GANTI DENGAN IP LAPTOP ANDA SAAT INI
-const API_URL = 'http://192.168.100.9:5000'; 
+const API_URL = 'http://192.168.100.9:5000'; // Sesuaikan IP Laptop Anda
+
+// --- KOMPONEN BARU: HIGHLIGHT TEXT ---
+// Fungsi ini memecah teks dan mewarnai kata yang cocok dengan query
+// --- KOMPONEN BARU: SMART HIGHLIGHT ---
+const HighlightText = ({ text, highlight, style }) => {
+    // 1. Cek jika teks dokumen kosong
+    if (!text) return null;
+  
+    // 2. Cek jika kata kunci kosong atau cuma spasi
+    if (!highlight || !highlight.trim()) {
+      return <Text style={style}>{text}</Text>;
+    }
+  
+    try {
+      // 3. AMAN: Bersihkan kata kunci dari spasi (trim) dan karakter regex berbahaya
+      const cleanHighlight = highlight.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      // 4. Buat Regex
+      const regex = new RegExp(`(${cleanHighlight})`, 'gi');
+      const parts = text.split(regex);
+  
+      return (
+        <Text style={style}>
+          {parts.map((part, index) => 
+            // Bandingkan lower case agar tidak peduli huruf besar/kecil
+            part.toLowerCase() === cleanHighlight.toLowerCase() ? (
+              <Text key={index} style={{ backgroundColor: '#FFEB3B', color: '#000', fontWeight: 'bold' }}>
+                {part}
+              </Text>
+            ) : (
+              <Text key={index}>{part}</Text>
+            )
+          )}
+        </Text>
+      );
+    } catch (e) {
+      // 5. Fallback: Jika error regex, tampilkan teks biasa (jangan bikin aplikasi crash/blank)
+      console.error("Highlight Error:", e);
+      return <Text style={style}>{text}</Text>;
+    }
+  };
 
 export default function SearchScreen() {
   const { method } = useLocalSearchParams(); 
@@ -18,10 +58,8 @@ export default function SearchScreen() {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Format judul agar rapi (misal: "vector-space" jadi "Vector Space")
   const methodName = method ? method.toString().replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'Search';
 
-  // Efek: Jika metode clustering, langsung cari tanpa nunggu user ketik
   useEffect(() => {
     if (method === 'clustering') {
         handleSearch();
@@ -30,7 +68,6 @@ export default function SearchScreen() {
 
   const handleSearch = async () => {
     Keyboard.dismiss();
-    // Validasi input, kecuali untuk clustering yang tidak butuh query
     if (!query.trim() && method !== 'clustering') {
         Alert.alert("Info", "Mohon masukkan kata kunci pencarian terlebih dahulu.");
         return;
@@ -47,10 +84,8 @@ export default function SearchScreen() {
 
       if (method === 'clustering') {
          endpoint = `${API_URL}/clustering`;
-         // Clustering pakai GET
          response = await axios.get(endpoint, { timeout: 10000 });
       } else {
-         // Search biasa pakai POST
          response = await axios.post(endpoint, { query: query }, { timeout: 10000 });
       }
 
@@ -59,14 +94,9 @@ export default function SearchScreen() {
     } catch (error) {
       console.error("[ERROR DETAIL]:", error);
       let errorMessage = "Terjadi kesalahan koneksi.";
-
-      if (error.response) {
-        errorMessage = `Server Error: ${error.response.status}`;
-      } else if (error.request) {
-        errorMessage = "Gagal menghubungi server. Cek IP Laptop & Firewall.";
-      } else {
-        errorMessage = error.message;
-      }
+      if (error.response) errorMessage = `Server Error: ${error.response.status}`;
+      else if (error.request) errorMessage = "Gagal menghubungi server. Cek IP & Firewall.";
+      else errorMessage = error.message;
       
       Alert.alert("Gagal", errorMessage);
     } finally {
@@ -74,13 +104,11 @@ export default function SearchScreen() {
     }
   };
 
-  // --- RENDER ITEM (CARD YANG BISA DIKLIK) ---
-  const renderItem = ({ item, index }) => (
+  const renderItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.card}
       activeOpacity={0.7}
       onPress={() => {
-        // Navigasi ke halaman detail analisis
         router.push({
             pathname: "/detail-analysis",
             params: {
@@ -92,7 +120,6 @@ export default function SearchScreen() {
         });
       }}
     >
-      {/* Header Kartu: ID & Kategori */}
       <View style={styles.cardHeader}>
           <View style={styles.idContainer}>
             <MaterialIcons name="article" size={14} color="#A0A0A0" />
@@ -105,10 +132,14 @@ export default function SearchScreen() {
           )}
       </View>
 
-      {/* Isi Dokumen */}
-      <Text style={styles.cardBody}>{item.text}</Text>
+      {/* --- MENGGUNAKAN KOMPONEN HIGHLIGHT --- */}
+      {/* Kita ganti <Text> biasa dengan <HighlightText> */}
+      <HighlightText 
+        text={item.text} 
+        highlight={method === 'clustering' ? '' : query} // Jangan highlight kalau clustering
+        style={styles.cardBody} 
+      />
       
-      {/* Footer Kartu: Metrics (Score/Cluster) */}
       {(item.score !== undefined || item.cluster !== undefined) && (
         <View style={styles.cardFooter}>
             {item.score !== undefined && (
@@ -135,8 +166,6 @@ export default function SearchScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      
-      {/* --- HEADER CONFIG --- */}
       <Stack.Screen options={{ 
           headerTitle: methodName,
           headerStyle: { backgroundColor: '#F8F9FE' }, 
@@ -146,7 +175,6 @@ export default function SearchScreen() {
           headerBackTitleVisible: false,
       }} />
 
-      {/* --- INPUT SECTION --- */}
       {method !== 'clustering' && (
         <View style={styles.searchSection}>
             <View style={styles.searchBar}>
@@ -161,22 +189,16 @@ export default function SearchScreen() {
                     returnKeyType="search"
                 />
             </View>
-            
             <TouchableOpacity 
                 style={[styles.searchButton, loading && {backgroundColor: '#B0B0C0'}]} 
                 onPress={handleSearch}
                 disabled={loading}
             >
-                 {loading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                 ) : (
-                    <Ionicons name="arrow-forward" size={24} color="#fff" />
-                 )}
+                 {loading ? <ActivityIndicator size="small" color="#fff" /> : <Ionicons name="arrow-forward" size={24} color="#fff" />}
             </TouchableOpacity>
         </View>
       )}
 
-      {/* --- LIST SECTION --- */}
       {loading && method === 'clustering' && (
          <View style={styles.centerLoader}>
             <ActivityIndicator size="large" color="#6C63FF" />
@@ -208,69 +230,24 @@ export default function SearchScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FE' },
-
-  // Search Section Styles
-  searchSection: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  searchBar: {
-    flex: 1,
-    flexDirection: 'row',
-    backgroundColor: '#fff',
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    borderRadius: 15,
-    alignItems: 'center',
-    // Soft Shadow
-    shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2,
-    marginRight: 10,
-    borderWidth: 1, borderColor: '#F0F0F0'
-  },
+  searchSection: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 15, alignItems: 'center' },
+  searchBar: { flex: 1, flexDirection: 'row', backgroundColor: '#fff', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 15, alignItems: 'center', shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 5, elevation: 2, marginRight: 10, borderWidth: 1, borderColor: '#F0F0F0' },
   searchInput: { flex: 1, fontSize: 16, color: '#333' },
-  searchButton: {
-    width: 50, height: 50,
-    backgroundColor: '#6C63FF', // Primary Purple
-    borderRadius: 15,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: "#6C63FF", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 5,
-  },
-
-  // List Styles
+  searchButton: { width: 50, height: 50, backgroundColor: '#6C63FF', borderRadius: 15, alignItems: 'center', justifyContent: 'center', shadowColor: "#6C63FF", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 5, elevation: 5 },
   listContainer: { paddingHorizontal: 20, paddingBottom: 30, paddingTop: 5 },
   centerLoader: { marginTop: 50, alignItems: 'center' },
-
-  // Card Styles
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 15,
-    // Modern Card Shadow
-    shadowColor: "#1E1E2D", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3,
-    borderWidth: 1, borderColor: '#F5F5FA'
-  },
+  card: { backgroundColor: '#fff', borderRadius: 20, padding: 20, marginBottom: 15, shadowColor: "#1E1E2D", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 10, elevation: 3, borderWidth: 1, borderColor: '#F5F5FA' },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
   idContainer: { flexDirection: 'row', alignItems: 'center' },
   cardId: { fontSize: 12, color: '#A0A0A0', fontWeight: '600', marginLeft: 5 },
-  
   categoryBadge: { backgroundColor: '#EEF2FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   categoryText: { color: '#6C63FF', fontSize: 11, fontWeight: '700' },
-  
   cardBody: { fontSize: 16, color: '#333', lineHeight: 24, fontWeight: '500' },
-
-  // Footer / Metrics
   cardFooter: { flexDirection: 'row', marginTop: 15, paddingTop: 15, borderTopWidth: 1, borderTopColor: '#F8F9FE' },
   metricBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, marginRight: 10 },
-  
-  metricScore: { backgroundColor: '#E6F7EF' }, // Light Green bg
-  metricCluster: { backgroundColor: '#F2E7FE' }, // Light Purple bg
-  
+  metricScore: { backgroundColor: '#E6F7EF' }, 
+  metricCluster: { backgroundColor: '#F2E7FE' }, 
   metricText: { fontSize: 12, fontWeight: 'bold', marginLeft: 5 },
-
-  // Empty State
   emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 60, opacity: 0.8 },
   emptyText: { fontSize: 18, fontWeight: 'bold', color: '#333', marginTop: 20 },
   emptySubText: { fontSize: 14, color: '#999', marginTop: 5, textAlign: 'center' },
