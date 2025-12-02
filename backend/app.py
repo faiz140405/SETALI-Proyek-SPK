@@ -4,7 +4,15 @@ import re
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
-from data import documents # Import data dummy kita
+from data import documents
+import speech_recognition as sr
+from pydub import AudioSegment
+import os
+import uuid
+import time
+
+ffmpeg_path = r"D:\ffmpeg-2025-11-27-git-61b034a47c-essentials_build\bin\ffmpeg.exe"
+ffprobe_path = r"D:\ffmpeg-2025-11-27-git-61b034a47c-essentials_build\bin\ffprobe.exe"
 
 app = Flask(__name__)
 CORS(app) # Agar bisa diakses dari HP/Emulator
@@ -27,6 +35,70 @@ def search_regex():
     except re.error:
         return jsonify({"error": "Invalid Regex Pattern"}), 400
     return jsonify(results)
+
+@app.route('/voice-search', methods=['POST'])
+def voice_search_handler():
+    print("\n--- [DEBUG] START VOICE SEARCH ---")
+
+    # Cek apakah konfigurasi path benar
+    if not os.path.exists(FFMPEG_PATH):
+        print(f"[FATAL ERROR] FFmpeg tidak ditemukan di: {FFMPEG_PATH}")
+        return jsonify({"error": "Konfigurasi Server Salah: FFmpeg hilang"}), 500
+
+    if 'audio' not in request.files:
+        return jsonify({"error": "No audio file"}), 400
+    
+    audio_file = request.files['audio']
+    filename = f"rec_{uuid.uuid4().hex[:8]}"
+    input_path = os.path.abspath(f"{filename}.m4a")
+    wav_path = os.path.abspath(f"{filename}.wav")
+
+    try:
+        # Simpan File Asli
+        audio_file.save(input_path)
+        
+        # Cek ukuran file
+        size = os.path.getsize(input_path)
+        if size < 100:
+            return jsonify({"error": "Rekaman kosong/corrupt"}), 400
+
+        # Konversi ke WAV
+        sound = AudioSegment.from_file(input_path)
+        sound.export(wav_path, format="wav")
+
+        # Speech to Text
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(wav_path) as source:
+            recognizer.adjust_for_ambient_noise(source) 
+            audio_data = recognizer.record(source)
+            # Kenali bahasa Indonesia
+            text = recognizer.recognize_google(audio_data, language='id-ID')
+            print(f"[SUCCESS] Teks: {text}")
+
+        # Bersihkan File
+        safe_delete(input_path)
+        safe_delete(wav_path)
+
+        return jsonify({"text": text})
+
+    except sr.UnknownValueError:
+        safe_delete(input_path)
+        safe_delete(wav_path)
+        return jsonify({"error": "Suara tidak jelas, coba lagi."}), 400
+        
+    except Exception as e:
+        print(f"[CRASH ERROR] {str(e)}")
+        safe_delete(input_path)
+        safe_delete(wav_path)
+        return jsonify({"error": str(e)}), 500
+
+def safe_delete(path):
+    try:
+        time.sleep(0.1) # Beri jeda agar file dilepas Windows
+        if os.path.exists(path):
+            os.remove(path)
+    except Exception as e:
+        print(f"[WARNING] Gagal hapus {path}: {e}")
 
 # 2. BOOLEAN RETRIEVAL (Sederhana AND/OR)
 @app.route('/search/boolean', methods=['POST'])
