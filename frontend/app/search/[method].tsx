@@ -5,7 +5,7 @@ import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import axios from 'axios';
 import { FontAwesome5, MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import AsyncStorage from '@react-native-async-storage/async-storage'; // <--- LIBRARY BARU
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // --- KONFIGURASI IP (SESUAIKAN) ---
 const API_URL = 'http://192.168.100.9:5000'; 
